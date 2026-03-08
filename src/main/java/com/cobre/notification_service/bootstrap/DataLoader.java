@@ -1,8 +1,10 @@
 package com.cobre.notification_service.bootstrap;
 
 import com.cobre.notification_service.delivery.domain.models.NotificationStatus;
+import com.cobre.notification_service.delivery.domain.models.WebhookSubscription;
 import com.cobre.notification_service.delivery.infrastructure.adapters.out.persistence.NotificationEntity;
 import com.cobre.notification_service.delivery.application.ports.out.NotificationRepositoryPort;
+import com.cobre.notification_service.delivery.application.ports.out.SubscriptionRepositoryPort;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -24,7 +26,10 @@ import java.util.List;
 @RequiredArgsConstructor
 public class DataLoader implements CommandLineRunner {
 
+    private static final String CLIENT003_WEBHOOK = "https://webhook.site/226d7a72-da0e-4bae-a480-5332c6878845";
+
     private final NotificationRepositoryPort notificationRepositoryPort;
+    private final SubscriptionRepositoryPort subscriptionRepositoryPort;
     private final ObjectMapper mapper;
 
     @Override
@@ -51,6 +56,21 @@ public class DataLoader implements CommandLineRunner {
             log.error("DataLoader: Failed to load seed data.", e);
             throw e;
         }
+
+        registerSubscriptions();
+    }
+
+    /**
+     * Registers known webhook subscriptions in the in-memory store.
+     * CLIENT002 and CLIENT003 are intentionally left unregistered so the
+     * "no subscription → FAILED" delivery path is exercised on startup.
+     *
+     * TODO: load subscriptions from DB when the webhook_subscriptions table is
+     * introduced.
+     */
+    private void registerSubscriptions() {
+        subscriptionRepositoryPort.register(new WebhookSubscription("CLIENT003", CLIENT003_WEBHOOK));
+        log.info("DataLoader: Registered webhook subscription for CLIENT001 -> {}", CLIENT003_WEBHOOK);
     }
 
     private NotificationEntity mapToEntity(NotificationEventRecord record) {

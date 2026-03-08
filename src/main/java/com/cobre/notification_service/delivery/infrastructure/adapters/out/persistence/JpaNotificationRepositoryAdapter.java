@@ -1,9 +1,11 @@
 package com.cobre.notification_service.delivery.infrastructure.adapters.out.persistence;
 
 import com.cobre.notification_service.delivery.application.ports.out.NotificationRepositoryPort;
+import com.cobre.notification_service.delivery.domain.models.NotificationStatus;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -31,5 +33,10 @@ public class JpaNotificationRepositoryAdapter implements NotificationRepositoryP
     @Override
     public List<NotificationEntity> findAll() {
         return jpaRepository.findAll();
+    }
+
+    @Override
+    public List<NotificationEntity> findPendingDue(LocalDateTime now) {
+        return jpaRepository.findPendingDue(NotificationStatus.PENDING, now);
     }
 }
