@@ -1,15 +1,16 @@
 package com.cobre.notification_service.selfservice.application.ports.out;
 
-import com.cobre.notification_service.selfservice.infrastructure.adapters.out.persistence.NotificationQueryEntity;
+import com.cobre.notification_service.selfservice.domain.models.NotificationView;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 
 public interface NotificationQueryPort {
 
-    List<NotificationQueryEntity> findAll();
+    List<NotificationView> findAll(String clientId, String status, LocalDate deliveryDate);
 
-    Optional<NotificationQueryEntity> findById(String eventId);
+    Optional<NotificationView> findById(String eventId);
 
-    List<NotificationQueryEntity> findByClientId(String clientId);
+    void save(NotificationView view);
 }

@@ -34,4 +34,10 @@ public class NotificationQueryEntity {
 
     @Column(name = "status")
     private String status;
+
+    @Column(name = "retry_count")
+    private int retryCount;
+
+    @Column(name = "next_retry_at")
+    private LocalDateTime nextRetryAt;
 }

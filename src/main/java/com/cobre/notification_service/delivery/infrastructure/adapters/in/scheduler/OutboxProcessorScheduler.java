@@ -17,8 +17,10 @@ public class OutboxProcessorScheduler {
      * Fires every 30 seconds after the previous execution completes.
      * Using fixedDelay (not fixedRate) to avoid overlapping runs if delivery is
      * slow.
+     * Initial delay of 15 seconds to allow the application to start up and
+     * initialize the in-memory store, preventing race condition
      */
-    @Scheduled(fixedDelay = 30_000)
+    @Scheduled(fixedDelay = 30_000, initialDelay = 15_000)
     public void processOutbox() {
         log.info("OutboxProcessorScheduler: triggering outbox sweep.");
         deliveryUseCase.processAllPendingNotifications();

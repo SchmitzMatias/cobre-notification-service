@@ -3,10 +3,14 @@ package com.cobre.notification_service.delivery.infrastructure.adapters.out.webh
 import com.cobre.notification_service.delivery.application.ports.out.WebhookPort;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 
 import java.time.Duration;
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 
 @Slf4j
 @Component
@@ -21,16 +25,22 @@ public class RestClientWebhookAdapter implements WebhookPort {
     }
 
     @Override
-    public void send(String webhookUrl, String eventId, String eventType, String content) {
+    public LocalDateTime send(String webhookUrl, String eventId, String eventType, String content) {
         String payload = buildPayload(eventId, eventType, content);
         log.debug("RestClientWebhookAdapter: POST {} | payload={}", webhookUrl, payload);
 
-        restClient.post()
+        ResponseEntity<Void> response = restClient.post()
                 .uri(webhookUrl)
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(payload)
                 .retrieve()
                 .toBodilessEntity(); // throws RestClientException on non-2xx
+
+        long dateHeader = response.getHeaders().getDate();
+        if (dateHeader > 0) {
+            return LocalDateTime.ofInstant(Instant.ofEpochMilli(dateHeader), ZoneId.systemDefault());
+        }
+        return LocalDateTime.now();
     }
 
     // ── Private helpers ───────────────────────────────────────────────────────

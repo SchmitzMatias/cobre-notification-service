@@ -4,9 +4,9 @@ import com.cobre.notification_service.delivery.application.ports.in.ProcessPendi
 import com.cobre.notification_service.delivery.application.ports.out.NotificationRepositoryPort;
 import com.cobre.notification_service.delivery.application.ports.out.SubscriptionRepositoryPort;
 import com.cobre.notification_service.delivery.application.ports.out.WebhookPort;
+import com.cobre.notification_service.delivery.domain.models.Notification;
 import com.cobre.notification_service.delivery.domain.models.NotificationStatus;
 import com.cobre.notification_service.delivery.domain.models.WebhookSubscription;
-import com.cobre.notification_service.delivery.infrastructure.adapters.out.persistence.NotificationEntity;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -29,18 +29,18 @@ public class DeliveryService implements ProcessPendingNotificationsUseCase {
     @Override
     public void processAllPendingNotifications() {
         LocalDateTime now = LocalDateTime.now();
-        List<NotificationEntity> pending = notificationRepository.findPendingDue(now);
+        List<Notification> pending = notificationRepository.findPendingDue(now);
 
         log.info("DeliveryService: Processing {} pending notification(s).", pending.size());
 
-        for (NotificationEntity notification : pending) {
+        for (Notification notification : pending) {
             processSingle(notification, now);
         }
     }
 
     // ── Private helpers ───────────────────────────────────────────────────────
 
-    private void processSingle(NotificationEntity notification, LocalDateTime now) {
+    private void processSingle(Notification notification, LocalDateTime now) {
         String clientId = notification.getClientId();
         Optional<WebhookSubscription> subscriptionOpt = subscriptionRepository.findByClientId(clientId);
 
@@ -55,12 +55,13 @@ public class DeliveryService implements ProcessPendingNotificationsUseCase {
         String webhookUrl = subscriptionOpt.get().webhookUrl();
 
         try {
-            webhookPort.send(webhookUrl, notification.getEventId(),
+            LocalDateTime deliveryDate = webhookPort.send(webhookUrl, notification.getEventId(),
                     notification.getEventType(), notification.getContent());
 
             log.info("DeliveryService: event={} delivered successfully to {}.",
                     notification.getEventId(), webhookUrl);
             notification.setStatus(NotificationStatus.COMPLETED);
+            notification.setDeliveryDate(deliveryDate);
 
         } catch (Exception ex) {
             handleDeliveryFailure(notification, now, webhookUrl, ex);
@@ -69,7 +70,7 @@ public class DeliveryService implements ProcessPendingNotificationsUseCase {
         notificationRepository.save(notification);
     }
 
-    private void handleDeliveryFailure(NotificationEntity notification, LocalDateTime now,
+    private void handleDeliveryFailure(Notification notification, LocalDateTime now,
             String webhookUrl, Exception cause) {
         int newRetryCount = notification.getRetryCount() + 1;
         notification.setRetryCount(newRetryCount);

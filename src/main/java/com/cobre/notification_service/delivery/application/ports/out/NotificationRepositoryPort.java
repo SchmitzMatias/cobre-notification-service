@@ -1,24 +1,19 @@
 package com.cobre.notification_service.delivery.application.ports.out;
 
-import com.cobre.notification_service.delivery.infrastructure.adapters.out.persistence.NotificationEntity;
+import com.cobre.notification_service.delivery.domain.models.Notification;
 
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Optional;
 
 public interface NotificationRepositoryPort {
 
-    NotificationEntity save(NotificationEntity entity);
+    void save(Notification notification);
 
-    List<NotificationEntity> saveAll(List<NotificationEntity> entities);
-
-    Optional<NotificationEntity> findById(String eventId);
-
-    List<NotificationEntity> findAll();
+    void saveAll(List<Notification> notifications);
 
     /**
      * Returns all PENDING notifications that are ready to be processed:
      * those with no scheduled retry yet, or whose retry time has already passed.
      */
-    List<NotificationEntity> findPendingDue(LocalDateTime now);
+    List<Notification> findPendingDue(LocalDateTime now);
 }

@@ -1,8 +1,8 @@
 package com.cobre.notification_service.bootstrap;
 
+import com.cobre.notification_service.delivery.domain.models.Notification;
 import com.cobre.notification_service.delivery.domain.models.NotificationStatus;
 import com.cobre.notification_service.delivery.domain.models.WebhookSubscription;
-import com.cobre.notification_service.delivery.infrastructure.adapters.out.persistence.NotificationEntity;
 import com.cobre.notification_service.delivery.application.ports.out.NotificationRepositoryPort;
 import com.cobre.notification_service.delivery.application.ports.out.SubscriptionRepositoryPort;
 import lombok.Data;
@@ -27,6 +27,8 @@ import java.util.List;
 public class DataLoader implements CommandLineRunner {
 
     private static final String CLIENT003_WEBHOOK = "https://webhook.site/226d7a72-da0e-4bae-a480-5332c6878845";
+    // private static final String CLIENT003_WEBHOOK =
+    // "https://httpbin.org/status/404";
 
     private final NotificationRepositoryPort notificationRepositoryPort;
     private final SubscriptionRepositoryPort subscriptionRepositoryPort;
@@ -45,8 +47,8 @@ public class DataLoader implements CommandLineRunner {
 
             List<NotificationEventRecord> records = wrapper.getEvents();
 
-            List<NotificationEntity> entities = records.stream()
-                    .map(this::mapToEntity)
+            List<Notification> entities = records.stream()
+                    .map(this::mapToDomain)
                     .toList();
 
             notificationRepositoryPort.saveAll(entities);
@@ -70,16 +72,20 @@ public class DataLoader implements CommandLineRunner {
      */
     private void registerSubscriptions() {
         subscriptionRepositoryPort.register(new WebhookSubscription("CLIENT003", CLIENT003_WEBHOOK));
-        log.info("DataLoader: Registered webhook subscription for CLIENT001 -> {}", CLIENT003_WEBHOOK);
+        log.info("DataLoader: Registered webhook subscription for CLIENT003 -> {}", CLIENT003_WEBHOOK);
     }
 
-    private NotificationEntity mapToEntity(NotificationEventRecord record) {
-        // Business rule: "completed" -> COMPLETED, "failed" -> PENDING (retry pickup)
-        NotificationStatus status = "completed".equalsIgnoreCase(record.getDeliveryStatus())
-                ? NotificationStatus.COMPLETED
-                : NotificationStatus.PENDING;
+    private Notification mapToDomain(NotificationEventRecord record) {
+        NotificationStatus status;
+        if ("completed".equalsIgnoreCase(record.getDeliveryStatus())) {
+            status = NotificationStatus.COMPLETED;
+        } else if ("failed".equalsIgnoreCase(record.getDeliveryStatus())) {
+            status = NotificationStatus.FAILED;
+        } else {
+            status = NotificationStatus.PENDING;
+        }
 
-        return NotificationEntity.builder()
+        return Notification.builder()
                 .eventId(record.getEventId())
                 .eventType(record.getEventType())
                 .content(record.getContent())
@@ -88,7 +94,6 @@ public class DataLoader implements CommandLineRunner {
                 .status(status)
                 .retryCount(0)
                 .nextRetryAt(null)
-                .webhookUrl(null)
                 .build();
     }
 
