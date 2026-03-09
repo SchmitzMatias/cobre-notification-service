@@ -7,7 +7,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 
-import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -18,10 +17,8 @@ public class RestClientWebhookAdapter implements WebhookPort {
 
     private final RestClient restClient;
 
-    public RestClientWebhookAdapter() {
-        this.restClient = RestClient.builder()
-                .requestFactory(buildRequestFactory())
-                .build();
+    public RestClientWebhookAdapter(RestClient.Builder restClientBuilder) {
+        this.restClient = restClientBuilder.build();
     }
 
     @Override
@@ -67,10 +64,4 @@ public class RestClientWebhookAdapter implements WebhookPort {
                 .replace("\r", "\\r");
     }
 
-    private org.springframework.http.client.SimpleClientHttpRequestFactory buildRequestFactory() {
-        var factory = new org.springframework.http.client.SimpleClientHttpRequestFactory();
-        factory.setConnectTimeout(Duration.ofSeconds(3));
-        factory.setReadTimeout(Duration.ofSeconds(5));
-        return factory;
-    }
 }
