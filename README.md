@@ -11,21 +11,109 @@ For this challenge, a **Hexagonal Architecture (Ports & Adapters)** approach com
 * **Exponential Backoff Retry Strategy:** Implementation of automatic retries with increasing wait times to avoid overwhelming client servers during temporary failures.
 * **Traceability & Logging:** Comprehensive event tracking across the delivery lifecycle, ensuring every notification state change is logged for auditability and future observability integration.
 
+```mermaid
+flowchart TB
+    %% Definición de estilos al estilo C4 para mayor legibilidad
+    classDef person fill:#08427b,stroke:#052e56,color:#fff
+    classDef external fill:#999999,stroke:#666666,color:#fff
+    classDef db fill:#438dd5,stroke:#2e6295,color:#fff
+    classDef spacer fill:none,stroke:none,color:none
+    
+    %% Colores para las capas de la Arquitectura Hexagonal
+    classDef adapter fill:#85bbf0,stroke:#5d82a8,color:#000
+    classDef port fill:#ff9800,stroke:#b26a00,color:#000
+    classDef appService fill:#4caf50,stroke:#388e3c,color:#fff
+    classDef domain fill:#f44336,stroke:#d32f2f,color:#fff
+
+    Client["Client / Platform Admin [Person]"]:::person
+    EventSource["Event Source System [External System]"]:::external
+    WebhookTarget["Webhook Target [External System]"]:::external
+    Database[("Database [Container]")]:::db
+
+    subgraph NotificationService ["Notification Service [Container]"]
+        direction TB
+        
+        %% Espaciador invisible para empujar el contenido hacia abajo y evitar que el texto se superponga
+        SpacerTop[" "]:::spacer
+        
+        %% Driving Adapters (Entrada)
+        REST_Ctrl_SelfService["REST Controllers (Self-Service) CRUD Suscripciones y Tipos de Eventos [Driving Adapter]"]:::adapter
+        REST_Ctrl_Delivery["REST Controllers (Delivery) Ingesta de Eventos [Driving Adapter]"]:::adapter
+        Scheduler["Scheduler [Driving Adapter]"]:::adapter
+        
+        %% Forzamos a que el espaciador esté arriba de los controllers
+        SpacerTop ~~~ REST_Ctrl_SelfService
+        SpacerTop ~~~ REST_Ctrl_Delivery
+        SpacerTop ~~~ Scheduler
+        
+        %% Inbound Ports
+        InPort("Inbound Ports [Interfaces]"):::port
+        
+        %% Core (Dominio y Casos de Uso)
+        AppSvc["Application Services - Use Cases [Component]"]:::appService
+        Domain{"Domain Model [Component]"}:::domain
+        
+        %% Outbound Ports
+        OutPort("Outbound Ports [Interfaces]"):::port
+        
+        %% Driven Adapters (Salida)
+        JpaRepo["JPA Repositories [Driven Adapter]"]:::adapter
+        WebhookAdapter["RestClientWebhookAdapter [Driven Adapter]"]:::adapter
+    end
+
+    %% Interacciones Externas de Entrada
+    Client -->|"Gestiona Suscripciones y Eventos (API REST)"| REST_Ctrl_SelfService
+    EventSource -->|"Publica Eventos (API REST)"| REST_Ctrl_Delivery
+
+    %% Flujo Interno Hexagonal
+    REST_Ctrl_SelfService -->|"Invoca"| InPort
+    REST_Ctrl_Delivery -->|"Invoca"| InPort
+    Scheduler -->|"Dispara (Reintentos, etc)"| InPort
+    
+    InPort -.->|"Implementado por"| AppSvc
+    AppSvc -->|"Usa"| Domain
+    AppSvc -->|"Usa"| OutPort
+    
+    OutPort -.->|"Implementado por"| JpaRepo
+    OutPort -.->|"Implementado por"| WebhookAdapter
+
+    %% Interacciones Externas de Salida
+    JpaRepo -->|"Lee / Escribe (JPA)"| Database
+    WebhookAdapter -->|"Notificación HTTP POST"| WebhookTarget
+```
+
+
+### 📋 Instructions to run the project
+> pre requisites: Java 17 or higher, Docker & Docker Compose
+1) Clone the repository, install all dependencies `mvn clean install`
+2) Set up the database running `docker-compose up -d`
+3) Run the application `mvn spring-boot:run`
+4) Sample requests: `postman/Cobre.postman_collection.json`
+
+
+## ⚖️ Technical Trade-offs & Assumptions
+
+To fulfill the challenge requirements within the established timeframe while ensuring a reliable core engine, the following strategic decisions were made:
+
+* **In-Memory Subscriptions:** For this version, webhook subscriptions are managed via an `InMemorySubscriptionAdapter`. This ensures the solution is "plug-and-play" for reviewers, avoiding the overhead of a dedicated Subscription CRUD, while maintaining the flexibility to swap it for a persistent DB adapter in the future thanks to the Hexagonal Ports.
+* **JSON-Based Event Bootstrapping:** The system relies on a seed JSON file to load initial business events. This allows the Outbox Scheduler to demonstrate the delivery logic, retry policies, and state transitions immediately upon startup without requiring an external producer API or implement a ABM logic.
+* **Test-Driven Reliability:** Resources were prioritized towards achieving **100% coverage in Application Services**. Ensuring that the business logic for notification delivery and search is bulletproof was considered more critical than implementing boilerplate CRUD operations for entities.
+
 
 ### Security Considerations
 Following the proposition of the challenge, here are 3 main security concerns from the OWASP Top 10 2025:
 
-A01:2025 - Broken Access Control:
+**A01:2025 - Broken Access Control:**
 Risk: Potential IDOR (Insecure Direct Object Reference) where a client could query or replay notifications from another merchant by changing the clientId in the request.
 
 Mitigation: Enforce JWT-based authorization. The clientId used in the queries will be extracted from the authenticated security context, not the request body or URL parameters.
 
-A06:2025 - Insecure Design (Resource Exhaustion):
+**A06:2025 - Insecure Design (Resource Exhaustion):**
 Risk: Lack of rate-limiting on the Replay API or the search endpoint could lead to database denial of service (DoS).
 
 Mitigation: Implementation of an API Gateway or local Rate Limiter and mandatory pagination for all query results to protect system resources.
 
-A07:2025 - Authentication Failures:
+**A07:2025 - Authentication Failures:**
 Risk: Exposure of the delivery status and replay mechanism to unauthorized users on the public internet.
 
 Mitigation: Mandatory HTTPS for all communication and the use of modern authentication protocols (OIDC/OAuth2) to ensure only verified clients can interact with the API.
